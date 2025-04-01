@@ -1,6 +1,7 @@
 
 # model_name = "distilgpt2"  
-model_name ="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+#model_name ="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+model_name = "tiiuae/falcon-rw-1b"
 testOutputC = {"intent": "CONVERSATION"}
 testOutputD = {"intent": "DOCUMENT_RETRIEVAL"}
 
@@ -73,11 +74,7 @@ class MacMiniTextProcessor:
     
     def process_text(self, user_text):
 
-        system_prompt = """
-For the given user query, determine whether the user request is a DOCUMENT_RETRIEVAL or CONVERSATION. Do not give Outputs other than these. please provide a JSON response with the following structure:
-{
-    "intent": "value",
-} 
+        system_prompt = f""" You have two output formats {testOutputD} and {testOutputC}. {testOutputD} should be responded to the user when the user is is asking for personal records or documents. {testOutputC} should be responsed with at all times. We do not need to have a conversation with the user. I fyou do not have the records please respond with this template {testOutputC}. Dont give any other outputs.
 """
         
         if "llama" in self.model_name.lower() or "tinyllama" in self.model_name.lower():
@@ -98,8 +95,9 @@ For the given user query, determine whether the user request is a DOCUMENT_RETRI
                 outputs = self.model.generate(
                     **input_tensors,
                     max_new_tokens=256,  
-                    temperature=0.5,  
+                    temperature=0.1,  
                     do_sample=True,
+                    pad_token_id=self.tokenizer.eos_token_id
                 )
             
             del input_tensors
@@ -135,6 +133,8 @@ For the given user query, determine whether the user request is a DOCUMENT_RETRI
                     response_text = generated_text.split(user_text)[-1].strip()
                 else:
                     response_text = generated_text
+
+                print(f":::{response_text}")    
             json_match = re.search(r'({[\s\S]*})', response_text)
             
             if json_match:
@@ -156,11 +156,11 @@ For the given user query, determine whether the user request is a DOCUMENT_RETRI
             print(f"Error during processing or generation: {e}")
             return {"error": str(e)}
 
-def main():
+def main(): 
     print("Initializing Mac Mini optimized processor...")
     processor = MacMiniTextProcessor(model_name=model_name)
     
-    user_query = "Show me my recent Blood Sugar records"
+    user_query = "please fetch my blood report"
     
     response_c = processor.process_text(user_query)
     print(json.dumps(response_c, indent=2))
