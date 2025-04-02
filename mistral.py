@@ -11,7 +11,6 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 
 def infer_intent(user_input):
-
     prompt = f"""
 Task: Determine if the following user query is asking to see personal data or documents.
 If the query is asking to show, see, intents to see, access, retrieve, or find personal data, documents, or information, classify it as "DOCUMENT_RETRIEVAL".
@@ -26,8 +25,7 @@ Classification (only respond with exactly DOCUMENT_RETRIEVAL or CONVERSATION):
     classification = model(
         prompt,
         max_new_tokens=10,  
-        temperature=0.7 ,
-        
+        temperature=0.7 ,    
     ).strip()
     
     if "DOCUMENT_RETRIEVAL" in classification:
@@ -55,11 +53,6 @@ def process_user_query(user_input):
     return {
         "classification": testOutput
     }
-
-
-
-
-
 
 
 def chatWithUser():
