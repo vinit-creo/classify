@@ -1,18 +1,9 @@
 
 # model_name = "distilgpt2"  
-#model_name ="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-model_name = "tiiuae/falcon-rw-1b"
+model_name ="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+# model_name = "tiiuae/falcon-rw-1b"
 testOutputC = {"intent": "CONVERSATION"}
 testOutputD = {"intent": "DOCUMENT_RETRIEVAL"}
-
-# messages = [
-#     {
-#         "role": "system",
-#         "content": "You are a friendly chatbot who always responds in the style of a pirate",
-#     },
-#     {"role": "user", "content": "How many helicopters can a human eat in one sitting?"},
-# ]
-
 
 
 import torch
@@ -57,7 +48,8 @@ class MacMiniTextProcessor:
             except Exception as e:                
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_name,
-                    low_cpu_mem_usage=True
+                    low_cpu_mem_usage=True,
+                    load_in_4bit=True
                 )
                 
                 self.device = torch.device("cpu")
@@ -74,8 +66,24 @@ class MacMiniTextProcessor:
     
     def process_text(self, user_text):
 
-        system_prompt = f""" You have two output formats {testOutputD} and {testOutputC}. {testOutputD} should be responded to the user when the user is is asking for personal records or documents. {testOutputC} should be responsed with at all times. We do not need to have a conversation with the user. I fyou do not have the records please respond with this template {testOutputC}. Dont give any other outputs.
-"""
+        system_prompt = f"""
+    Analyze the input and respond in JSON with 'intent' as either 'DOCUMENT_RETRIEVAL' or 'Conversation':
+    
+    Examples:
+    1. Input: "Show me my blood test results"
+       Output: {{"intent": "DOCUMENT_RETRIEVAL"}}
+    
+    2. Input: "What's the weather today?"
+       Output: {{"intent": "Conversation"}}
+    
+    3. Input: "Did my MRI report arrive?"
+       Output: {{"intent": "DOCUMENT_RETRIEVAL"}}'
+    4. Inpout: "How does my blood work look like"
+       Output:{{"intent": "DOCUMENT_RETRIEVAL"}} 
+    
+    5. Input: "{user_text}"
+       Output: 
+    """
         
         if "llama" in self.model_name.lower() or "tinyllama" in self.model_name.lower():
             full_prompt = f"<s>[INST] <<SYS>>\n{system_prompt}\n<</SYS>>\n\n{user_text} [/INST]"
@@ -105,8 +113,7 @@ class MacMiniTextProcessor:
                 try:
                     torch.mps.empty_cache()
                 except:
-                    pass
-            
+                    pass           
             generated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
             del outputs
             gc.collect()
@@ -121,7 +128,6 @@ class MacMiniTextProcessor:
             if "llama" in self.model_name.lower() or "tinyllama" in self.model_name.lower():
                 if "[/INST]" in generated_text:
                     response_text = generated_text.split("[/INST]")[-1].strip()
-                    print(f"::: check here the out put {generated_text}")                   
             elif "gpt" in self.model_name.lower():
                 if "Response:" in generated_text:
                     response_text = generated_text.split("Response:")[-1].strip()
@@ -139,6 +145,7 @@ class MacMiniTextProcessor:
             
             if json_match:
                 json_str = json_match.group(1)
+                print(f"::: json str {json_str}")
                 try:
                     parsed_json = json.loads(json_str)
                     return parsed_json
@@ -160,7 +167,7 @@ def main():
     print("Initializing Mac Mini optimized processor...")
     processor = MacMiniTextProcessor(model_name=model_name)
     
-    user_query = "please fetch my blood report"
+    user_query = "How does the weather look like??"
     
     response_c = processor.process_text(user_query)
     print(json.dumps(response_c, indent=2))
